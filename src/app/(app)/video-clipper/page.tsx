@@ -61,7 +61,7 @@ export default function VideoClipperPage() {
   // Media preview state
   const [mediaSrc, setMediaSrc]     = useState<string | null>(null);
   const [mediaType, setMediaType]   = useState<"video" | "image" | null>(null);
-  const [videoDuration, setVideoDuration] = useState(0);
+  const [, setVideoDuration] = useState(0);
 
   const fileRef      = useRef<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);

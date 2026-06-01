@@ -6,7 +6,7 @@ import { ArrowLeft, CheckCircle, XCircle, Loader2, AlertCircle } from "lucide-re
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -82,7 +82,6 @@ export default function VideoTaskPage({
     if (!accessToken || isTerminal) return;
 
     const socket = getSocket(accessToken);
-    const room = `video:${taskId}`;
 
     socket.emit("subscribe", { resource: "video", id: taskId });
 
