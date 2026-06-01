@@ -59,9 +59,6 @@ function deriveSubLabel(card: BoardCard): string {
           return `${platforms} · ${found} articles`;
       }
     }
-    case "generating":
-      if (post && post.revisionCount > 0) return `Revision ${post.revisionCount} · Refining`;
-      return "Step 2/3 · Analyzing...";
     case "pending_review":
       if (post?.reviewScore) return `AI score: ${post.reviewScore.toFixed(1)}/10`;
       return "Awaiting review";
