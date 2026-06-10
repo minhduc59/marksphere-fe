@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -21,6 +22,7 @@ import { Switch } from "@/components/ui/switch";
 import { useTriggerScan } from "@/hooks/api/use-scans";
 import { useSettingsStore } from "@/stores/settings-store";
 import { usePipelineStore } from "@/stores/pipeline-store";
+import { usePipelineConfig } from "@/hooks/api/use-pipeline-config";
 import { PostFormat, type TriggerScanDto } from "@/lib/api/types";
 
 const startScanSchema = z.object({
@@ -64,6 +66,7 @@ export function StartScanModal({ open, onOpenChange }: StartScanModalProps) {
   const triggerScan = useTriggerScan();
   const keywords = useSettingsStore((s) => s.keywords);
   const setActiveScan = usePipelineStore((s) => s.setActiveScan);
+  const { data: pipelineConfig } = usePipelineConfig();
 
   const {
     register,
@@ -79,8 +82,21 @@ export function StartScanModal({ open, onOpenChange }: StartScanModalProps) {
   });
 
   useEffect(() => {
-    if (!open) reset(DEFAULTS);
-  }, [open, reset]);
+    if (!open) return;
+    reset({
+      max_items_per_platform:
+        pipelineConfig?.max_items_per_platform ?? DEFAULTS.max_items_per_platform,
+      include_comments:
+        pipelineConfig?.include_comments ?? DEFAULTS.include_comments,
+      quality_threshold:
+        pipelineConfig?.quality_threshold ?? DEFAULTS.quality_threshold,
+      generate_posts: DEFAULTS.generate_posts,
+      num_posts: pipelineConfig?.num_posts ?? DEFAULTS.num_posts,
+      formats:
+        (pipelineConfig?.allowed_formats as PostFormat[] | null | undefined) ??
+        DEFAULTS.formats,
+    });
+  }, [open, pipelineConfig, reset]);
 
   const generatePosts = watch("generate_posts");
   const selectedFormats = watch("formats");
@@ -130,6 +146,18 @@ export function StartScanModal({ open, onOpenChange }: StartScanModalProps) {
             Configure how the trend scan should run and which posts to
             generate.
           </DialogDescription>
+          {pipelineConfig && (
+            <p className="text-xs text-muted-foreground">
+              Defaults loaded from your{" "}
+              <Link
+                href="/settings/pipeline"
+                className="underline underline-offset-2"
+              >
+                Pipeline configuration
+              </Link>
+              .
+            </p>
+          )}
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Radar, FileText, Send, Link2, ClipboardCheck } from "lucide-react";
+import { Radar, FileText, Send, Link2, ClipboardCheck, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 
@@ -12,29 +12,68 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ContentStatusBadge } from "@/components/ui/content-status-badge";
 import { ArticleUrlModal } from "@/components/dashboard/article-url-modal";
 import { StartScanModal } from "@/components/dashboard/start-scan-modal";
+import { StartPipelineModal } from "@/components/dashboard/start-pipeline-modal";
 import { ScanPipelineProgress } from "@/components/pipeline/scan-pipeline-progress";
+import { PublishPipelineProgress } from "@/components/pipeline/publish-pipeline-progress";
+import { OverallPipelineProgress } from "@/components/pipeline/overall-pipeline-progress";
 import { useScans } from "@/hooks/api/use-scans";
+import { usePipelineRuns } from "@/hooks/api/use-pipeline-runs";
 import { usePosts } from "@/hooks/api/use-posts";
 import { useTopTrends } from "@/hooks/api/use-trends";
 import { usePublishHistory } from "@/hooks/api/use-publish";
 import { usePipelineStore } from "@/stores/pipeline-store";
 import { ScanStatus, ContentStatus } from "@/lib/api/types";
 
+// Mirrors the backend SCAN_STALE_TIMEOUT_MINUTES watchdog: a run older than
+// this is treated as stuck (not actually running), so it stops disabling the
+// scan / pipeline buttons even before the backend sweep fails it.
+const STALE_RUN_MS = 30 * 60 * 1000;
+
+function isActiveRun(status: ScanStatus, startedAt: string | null): boolean {
+  if (status !== ScanStatus.RUNNING && status !== ScanStatus.PENDING) return false;
+  if (!startedAt) return true;
+  return Date.now() - new Date(startedAt).getTime() < STALE_RUN_MS;
+}
+
 export default function DashboardPage() {
   const { data: trends,        isLoading: trendsLoading   } = useTopTrends("7d");
   const { data: posts,         isLoading: postsLoading    } = usePosts({ pageSize: 1 });
   const { data: published,     isLoading: publishLoading  } = usePublishHistory({ status: "published", pageSize: 1 });
   const { data: pendingReview, isLoading: reviewLoading   } = usePosts({ status: ContentStatus.DRAFT, pageSize: 1 });
-  const { data: scansData,     isLoading: scansLoading    } = useScans({ pageSize: 5 });
+  const { data: scansData,     isLoading: scansLoading    } = useScans(
+    { pageSize: 5 },
+    {
+      refetchInterval: (q) =>
+        q.state.data?.items.some((s) => isActiveRun(s.status, s.startedAt))
+          ? 5000
+          : false,
+    },
+  );
   const { data: upcoming  } = usePublishHistory({ status: "pending", pageSize: 5 });
   const { data: recentPosts } = usePosts({ pageSize: 5 });
 
+  const { data: pipelineRuns } = usePipelineRuns(
+    { pageSize: 5 },
+    {
+      refetchInterval: (q) =>
+        q.state.data?.items.some((p) => isActiveRun(p.status, p.created_at))
+          ? 5000
+          : false,
+    },
+  );
+
   const activeScanId = usePipelineStore((s) => s.activeScanId);
+  const activePublishId = usePipelineStore((s) => s.activePublishId);
+  const activePipelineId = usePipelineStore((s) => s.activePipelineId);
   const [articleOpen, setArticleOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  const [pipelineOpen, setPipelineOpen] = useState(false);
 
-  const hasRunningScan = scansData?.items.some(
-    (s) => s.status === ScanStatus.RUNNING || s.status === ScanStatus.PENDING
+  const hasRunningScan = scansData?.items.some((s) =>
+    isActiveRun(s.status, s.startedAt)
+  );
+  const hasRunningPipeline = pipelineRuns?.items?.some((p) =>
+    isActiveRun(p.status, p.created_at)
   );
 
   const isLoading = trendsLoading || postsLoading || publishLoading || reviewLoading || scansLoading;
@@ -45,23 +84,36 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setArticleOpen(true)}>
+          <Button variant="outline" size="sm" onClick={() => setArticleOpen(true)}>
             <Link2 className="mr-2 h-4 w-4" />
-            From Article URL
+            From URL
           </Button>
-          <Button onClick={() => setScanOpen(true)} disabled={hasRunningScan}>
-            Start New Scan
+          <Button variant="outline" size="sm" onClick={() => setScanOpen(true)} disabled={hasRunningScan}>
+            Custom scan
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setPipelineOpen(true)}
+            disabled={hasRunningScan || hasRunningPipeline}
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
+            Start Pipeline
           </Button>
         </div>
       </div>
 
       <ArticleUrlModal open={articleOpen} onOpenChange={setArticleOpen} />
       <StartScanModal open={scanOpen} onOpenChange={setScanOpen} />
+      <StartPipelineModal open={pipelineOpen} onOpenChange={setPipelineOpen} />
 
-      {/* Live pipeline step tracker — stays visible until user dismisses or clean success */}
-      {activeScanId && (
+      {/* Live pipeline trackers — stay visible until dismissed or clean success */}
+      {activePipelineId && (
+        <OverallPipelineProgress pipelineId={activePipelineId} />
+      )}
+      {activeScanId && !activePipelineId && (
         <ScanPipelineProgress scanId={activeScanId} />
       )}
+      {activePublishId && <PublishPipelineProgress publishId={activePublishId} />}
 
       {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

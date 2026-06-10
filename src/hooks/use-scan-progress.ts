@@ -5,21 +5,44 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuthStore } from "@/stores/auth-store";
 import { getSocket } from "@/lib/socket";
+import { useScanStatus } from "@/hooks/api/use-scans";
+import { mapScanToView } from "@/lib/pipeline/phases";
 import { ScanStatus, type ScanStatusResponse } from "@/lib/api/types";
 
+/**
+ * Live scan + post-generation progress for a single scan run.
+ *
+ * Sources are merged (last-writer-wins): a REST seed via `useScanStatus`
+ * (so the banner is populated immediately on mount / refresh and survives a
+ * dropped socket) plus WebSocket `scan.progress|completed|error` events. The
+ * "done" state is derived from the data (`mapScanToView`), not from the
+ * completed event, so it stays correct even when the component mounts after
+ * the run has already finished.
+ */
 export function useScanProgress(scanId: string | null) {
   const [progress, setProgress] = useState<ScanStatusResponse | null>(null);
   const accessToken = useAuthStore((s) => s.accessToken);
   const queryClient = useQueryClient();
 
+  // REST seed (3s poll) — keeps the banner alive without the socket.
+  const { data: seed } = useScanStatus(scanId);
+  useEffect(() => {
+    if (seed) setProgress(seed);
+  }, [seed]);
+
   useEffect(() => {
     if (!scanId || !accessToken) return;
 
     const socket = getSocket(accessToken);
-    socket.emit("subscribe", { resource: "scan", id: scanId });
+    const subscribe = () => socket.emit("subscribe", { resource: "scan", id: scanId });
+    subscribe();
+    // Re-subscribe after a reconnect so a mid-run drop doesn't go silent.
+    socket.on("connect", subscribe);
 
     const handleProgress = (data: ScanStatusResponse) => {
       setProgress(data);
+      // Refresh the board as posts get produced during post-generation.
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
     };
 
     const handleCompleted = (data: ScanStatusResponse) => {
@@ -31,7 +54,6 @@ export function useScanProgress(scanId: string | null) {
       if (data.status === ScanStatus.FAILED) {
         toast.error(data.error ?? "Scan failed");
       } else if (data.error) {
-        // PARTIAL (0 posts) or COMPLETED with stage warnings
         if (data.status === ScanStatus.PARTIAL) {
           toast.error(data.error);
         } else {
@@ -53,11 +75,12 @@ export function useScanProgress(scanId: string | null) {
 
     return () => {
       socket.emit("unsubscribe", { resource: "scan", id: scanId });
+      socket.off("connect", subscribe);
       socket.off("scan.progress", handleProgress);
       socket.off("scan.completed", handleCompleted);
       socket.off("scan.error", handleError);
     };
   }, [scanId, accessToken, queryClient]);
 
-  return { progress, currentStep: progress?.current_step ?? null };
+  return { progress, view: mapScanToView(progress) };
 }

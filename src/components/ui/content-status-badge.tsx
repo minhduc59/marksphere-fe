@@ -27,6 +27,10 @@ const statusConfig: Record<ContentStatus, { label: string; className: string }> 
     label: "Regenerating",
     className: "border-blue-200 bg-blue-50 text-blue-700",
   },
+  [ContentStatus.FAILED]: {
+    label: "Failed",
+    className: "border-red-300 bg-red-100 text-red-800",
+  },
 };
 
 export function ContentStatusBadge({ status }: { status: ContentStatus }) {

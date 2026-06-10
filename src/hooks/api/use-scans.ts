@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseQueryOptions,
+} from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   getScans,
@@ -6,12 +11,21 @@ import {
   getScanStatus,
   triggerScan,
 } from "@/lib/api/scans";
-import type { TriggerScanDto } from "@/lib/api/types";
+import type { PaginatedResponse, ScanRun, TriggerScanDto } from "@/lib/api/types";
 
-export function useScans(params?: { page?: number; pageSize?: number }) {
+export function useScans(
+  params?: { page?: number; pageSize?: number },
+  options?: {
+    refetchInterval?: UseQueryOptions<
+      PaginatedResponse<ScanRun>,
+      Error
+    >["refetchInterval"];
+  },
+) {
   return useQuery({
     queryKey: ["scans", params],
     queryFn: () => getScans(params),
+    refetchInterval: options?.refetchInterval,
   });
 }
 

@@ -15,6 +15,7 @@ export enum ContentStatus {
   FLAGGED_FOR_REVIEW = "flagged_for_review",
   PUBLISHED = "published",
   REGENERATING = "regenerating",
+  FAILED = "failed",
 }
 
 export enum PostFormat {
@@ -125,6 +126,7 @@ export interface ScanStatusResponse {
   duration_ms: number | null;
   error: string | null;
   current_step?: string | null;
+  published_post_ids?: string[];
 }
 
 export interface TriggerScanDto {
@@ -140,6 +142,32 @@ export interface TriggerScanDto {
       formats?: string[] | null;
     };
   };
+}
+
+// ── Pipeline runs (end-to-end orchestration) ───────────
+
+export type PipelineStage = "scanning" | "generating" | "publishing";
+
+export interface PipelineRunResponse {
+  pipeline_id: string;
+  status: ScanStatus;
+  stage: PipelineStage | null;
+  created_at: string;
+}
+
+export interface PipelineRunStatusResponse {
+  pipeline_id: string;
+  status: ScanStatus;
+  stage: PipelineStage | null;
+  current_step?: string | null;
+  scan_run_id: string | null;
+  total_items_found: number;
+  content_post_ids: string[];
+  published_post_ids: string[];
+  error: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  duration_ms: number | null;
 }
 
 // ── Trend ──────────────────────────────────────────────
@@ -237,6 +265,8 @@ export interface ContentPost {
   reviewNotes: string | null;
   reviewCriteria: Record<string, unknown> | null;
   revisionCount: number;
+  failedStage: string | null;
+  errorReason: string | null;
   humanFeedback?: string | null;
   lastRevisionTargets?: {
     content: boolean;
@@ -376,3 +406,32 @@ export interface ScanSchedule {
   nextRunAt: string | null;
   createdAt: string;
 }
+
+// ── Pipeline Config ────────────────────────────────────
+
+export type PipelinePublishMode = "auto" | "manual" | "schedule";
+
+export interface PipelineConfig {
+  id: string;
+  owner_id: string | null;
+  max_items_per_platform: number;
+  quality_threshold: number;
+  include_comments: boolean;
+  keywords: string[];
+  num_posts: number;
+  allowed_formats: string[] | null;
+  require_review: boolean;
+  auto_approve_threshold: number;
+  auto_publish: boolean;
+  publish_mode: PipelinePublishMode;
+  scheduled_publish_time: string | null;
+  default_privacy_level: string;
+  scan_schedule_enabled: boolean;
+  scan_cron_expression: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export type PipelineConfigUpdate = Partial<
+  Omit<PipelineConfig, "id" | "owner_id" | "created_at" | "updated_at">
+>;

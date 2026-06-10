@@ -7,6 +7,7 @@ import {
   updatePostStatus,
   createPostFromArticle,
   reviewPost,
+  retryPost,
   type ArticleInput,
 } from "@/lib/api/posts";
 import type { ContentStatus, PostFilters, PostGenRequest } from "@/lib/api/types";
@@ -45,11 +46,19 @@ export function useGeneratePosts() {
 export function useCreatePostFromArticle() {
   const queryClient = useQueryClient();
   const setActiveScan = usePipelineStore((s) => s.setActiveScan);
+  const setActivePublish = usePipelineStore((s) => s.setActivePublish);
+  const setActivePipeline = usePipelineStore((s) => s.setActivePipeline);
   return useMutation({
     mutationFn: (payload: ArticleInput) => createPostFromArticle(payload),
     onSuccess: (res) => {
-      setActiveScan(res.scan_run_id);
-      queryClient.invalidateQueries({ queryKey: ["scans"] });
+      // From URL is now a first-class pipeline run polled via
+      // /pipeline/runs/{id}/status. Clear any stale scan/publish banners so only
+      // the unified OverallPipelineProgress renders (mirrors start-pipeline-modal).
+      setActiveScan(null);
+      setActivePublish(null);
+      setActivePipeline(res.pipeline_id);
+      queryClient.invalidateQueries({ queryKey: ["pipeline-runs"] });
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
       toast.success("Article submitted — generating posts");
     },
     onError: (err: unknown) => {
@@ -86,5 +95,17 @@ export function useReviewPost() {
       toast.success(action === "approve" ? "Post approved" : "Post sent back for revision");
     },
     onError: () => toast.error("Review action failed"),
+  });
+}
+
+export function useRetryPost() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => retryPost(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      toast.success("Retrying — regenerating this post");
+    },
+    onError: () => toast.error("Retry failed"),
   });
 }

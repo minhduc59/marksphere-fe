@@ -7,11 +7,11 @@ import { SourceFilter } from "@/components/pipeline/source-filter";
 import { ModeBadge } from "@/components/pipeline/mode-badge";
 import { PipelineBoard } from "@/components/pipeline/board";
 import { ScanPipelineProgress } from "@/components/pipeline/scan-pipeline-progress";
+import { PublishPipelineProgress } from "@/components/pipeline/publish-pipeline-progress";
+import { OverallPipelineProgress } from "@/components/pipeline/overall-pipeline-progress";
 import { usePipelineBoard, type SourceFilter as SF } from "@/hooks/use-pipeline-board";
 import { useScans } from "@/hooks/api/use-scans";
 import { usePipelineStore } from "@/stores/pipeline-store";
-import { useAuthStore } from "@/stores/auth-store";
-import { getSocket } from "@/lib/socket";
 import { ScanStatus } from "@/lib/api/types";
 
 export default function PipelinePage() {
@@ -19,7 +19,8 @@ export default function PipelinePage() {
   const { columns, isLoading } = usePipelineBoard(sourceFilter);
   const { data: scansData } = useScans({ pageSize: 5 });
   const activeScanId = usePipelineStore((s) => s.activeScanId);
-  const accessToken = useAuthStore((s) => s.accessToken);
+  const activePublishId = usePipelineStore((s) => s.activePublishId);
+  const activePipelineId = usePipelineStore((s) => s.activePipelineId);
   const queryClient = useQueryClient();
 
   // Determine if there's a running scan for the Daemon/One-time badge
@@ -27,28 +28,7 @@ export default function PipelinePage() {
     (s) => s.status === ScanStatus.RUNNING || s.status === ScanStatus.PENDING
   );
 
-  // Subscribe to active scan WS for real-time progress
-  useEffect(() => {
-    if (!activeScanId || !accessToken) return;
-    const socket = getSocket(accessToken);
-
-    socket.emit("subscribe", { resource: "scan", id: activeScanId });
-
-    function onProgress() {
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
-      queryClient.invalidateQueries({ queryKey: ["scans"] });
-    }
-    socket.on("scan.progress", onProgress);
-    socket.on("scan.completed", onProgress);
-
-    return () => {
-      socket.off("scan.progress", onProgress);
-      socket.off("scan.completed", onProgress);
-      socket.emit("unsubscribe", { resource: "scan", id: activeScanId });
-    };
-  }, [activeScanId, accessToken, queryClient]);
-
-  // Also poll every 8s as a fallback
+  // Poll every 8s as a fallback (the progress banner owns its own WS subscription)
   useEffect(() => {
     const interval = setInterval(() => {
       queryClient.invalidateQueries({ queryKey: ["posts"] });
@@ -78,10 +58,14 @@ export default function PipelinePage() {
         </div>
       </div>
 
-      {/* Live scan step tracker — stays visible until user dismisses or clean success */}
-      {activeScanId && (
+      {/* Live pipeline trackers — stay visible until dismissed or clean success */}
+      {activePipelineId && (
+        <OverallPipelineProgress pipelineId={activePipelineId} />
+      )}
+      {activeScanId && !activePipelineId && (
         <ScanPipelineProgress scanId={activeScanId} />
       )}
+      {activePublishId && <PublishPipelineProgress publishId={activePublishId} />}
 
       {/* Board */}
       {isLoading ? (

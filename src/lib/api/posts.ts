@@ -19,11 +19,22 @@ export const articleSchema = z.object({
       formats: z.array(z.string()).optional(),
     })
     .optional(),
+  publish_settings: z
+    .object({
+      require_review: z.boolean().optional(),
+      auto_approve_threshold: z.number().min(0).max(10).optional(),
+      auto_publish: z.boolean().optional(),
+      publish_mode: z.enum(["auto", "manual", "schedule"]).optional(),
+      scheduled_publish_time: z.string().optional(),
+      privacy_level: z.string().optional(),
+    })
+    .optional(),
 });
 
 export type ArticleInput = z.infer<typeof articleSchema>;
 
 export interface FromArticleResponse {
+  pipeline_id: string;
   scan_run_id: string;
   status: string;
   message?: string;
@@ -63,6 +74,19 @@ export async function reviewPost(
   dto: { action: "approve" | "reject"; feedback?: string }
 ) {
   const { data } = await apiClient.post(`/posts/${id}/review`, dto);
+  return data;
+}
+
+/**
+ * Retry a post that failed mid-pipeline (status === "failed").
+ *
+ * Unlike reviewPost (a quality rejection), this is error recovery: the AI
+ * service re-runs generation from scratch with no feedback needed. The row
+ * transitions regenerating → draft (success) or flagged_for_review (failure);
+ * poll GET /posts/:id (e.g. via pollPostUntilReady) to observe it.
+ */
+export async function retryPost(id: string) {
+  const { data } = await apiClient.post(`/posts/${id}/retry`);
   return data;
 }
 
