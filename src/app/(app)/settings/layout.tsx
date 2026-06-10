@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const settingsTabs = [
   { href: "/settings/keywords", label: "Keywords" },
   { href: "/settings/accounts", label: "Accounts" },
+  { href: "/settings/pipeline", label: "Pipeline" },
 ];
 
 export default function SettingsLayout({

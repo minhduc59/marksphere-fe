@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { ContentStatusBadge } from "@/components/ui/content-status-badge";
-import { usePost, useUpdatePostStatus } from "@/hooks/api/use-posts";
+import { usePost, useUpdatePostStatus, useRetryPost } from "@/hooks/api/use-posts";
 import { usePublishNow, useAutoPublish } from "@/hooks/api/use-publish";
 import { ContentStatus, PostFormat } from "@/lib/api/types";
 
@@ -26,6 +26,15 @@ const formatLabels: Record<PostFormat, string> = {
   [PostFormat.BEHIND_THE_TECH]: "Behind the Tech",
 };
 
+// Friendly labels for the pipeline stage a failed post errored at.
+const stageLabels: Record<string, string> = {
+  strategy_alignment: "strategy alignment",
+  content_generation: "content generation",
+  image_prompt_creation: "image prompt creation",
+  image_generation: "image generation",
+  auto_review: "auto review",
+};
+
 export default function ContentDetailPage({
   params,
 }: {
@@ -34,6 +43,7 @@ export default function ContentDetailPage({
   const { id } = params;
   const { data: post, isLoading } = usePost(id);
   const updateStatus = useUpdatePostStatus();
+  const retryPostMutation = useRetryPost();
   const publishNow = usePublishNow();
   const autoPublish = useAutoPublish();
 
@@ -73,6 +83,31 @@ export default function ContentDetailPage({
           </div>
         </div>
       </div>
+
+      {post.status === ContentStatus.FAILED && (
+        <Card className="border-red-300 bg-red-50">
+          <CardContent className="flex items-start justify-between gap-4 py-4">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-red-800">
+                Generation failed
+                {post.failedStage
+                  ? ` at: ${stageLabels[post.failedStage] ?? post.failedStage}`
+                  : ""}
+              </p>
+              {post.errorReason && (
+                <p className="text-sm text-red-700">{post.errorReason}</p>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => retryPostMutation.mutate(post.id)}
+              disabled={retryPostMutation.isPending}
+            >
+              {retryPostMutation.isPending ? "Retrying…" : "Retry"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Left: Content */}

@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { AlertCircle, CheckCircle, Loader2, XCircle } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle, Loader2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -10,33 +10,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import DynamicVideoPlayer from "@/components/video-clipper/dynamic-video-player";
-import { useAuthStore } from "@/stores/auth-store";
-import { getSocket } from "@/lib/socket";
-import { getVideoTask, reviewClip, type VideoClip, type VideoTask, type VideoTaskStatus } from "@/lib/api/video";
-
-const STAGE_LABELS: Record<string, string> = {
-  downloading: "Downloading video",
-  transcribing: "Transcribing audio",
-  analyzing: "Selecting clips with AI",
-  clipping: "Cutting clips",
-  captioning: "Burning captions",
-  uploading: "Uploading to cloud",
-  completed: "Done",
-  error: "Error",
-};
-
-const STATUS_COLOR: Record<string, string> = {
-  queued: "bg-muted text-muted-foreground",
-  downloading: "bg-blue-100 text-blue-800",
-  transcribing: "bg-purple-100 text-purple-800",
-  analyzing: "bg-orange-100 text-orange-800",
-  clipping: "bg-indigo-100 text-indigo-800",
-  captioning: "bg-pink-100 text-pink-800",
-  uploading: "bg-cyan-100 text-cyan-800",
-  completed: "bg-green-100 text-green-800",
-  error: "bg-red-100 text-red-800",
-  cancelled: "bg-muted text-muted-foreground",
-};
+import { PipelineProgress } from "@/components/pipeline/pipeline-progress";
+import { useVideoProgress } from "@/hooks/use-video-progress";
+import { reviewClip, type VideoClip } from "@/lib/api/video";
 
 interface TaskProgressProps {
   taskId: string;
@@ -44,72 +20,17 @@ interface TaskProgressProps {
 }
 
 export function TaskProgress({ taskId, onNewClip }: TaskProgressProps) {
-  const accessToken = useAuthStore((s) => s.accessToken);
+  const { task, view, isLoading, refetch } = useVideoProgress(taskId);
 
-  const [task, setTask] = useState<VideoTask | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isTerminal, setIsTerminal] = useState(false);
   const [feedbacks, setFeedbacks] = useState<Record<string, string>>({});
   const [reviewingClipId, setReviewingClipId] = useState<string | null>(null);
-
-  const fetchTask = useCallback(async () => {
-    try {
-      const t = await getVideoTask(taskId);
-      setTask(t);
-      if (t.status === "completed" || t.status === "error" || t.status === "cancelled") {
-        setIsTerminal(true);
-      }
-    } catch {
-      toast.error("Failed to load task");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [taskId]);
-
-  useEffect(() => {
-    fetchTask();
-  }, [fetchTask]);
-
-  useEffect(() => {
-    if (!accessToken || isTerminal) return;
-
-    const socket = getSocket(accessToken);
-    socket.emit("subscribe", { resource: "video", id: taskId });
-
-    socket.on("video.progress", (data: { taskId: string; stage: string; message?: string }) => {
-      if (data.taskId !== taskId) return;
-      setTask((prev) => prev ? { ...prev, status: data.stage as VideoTaskStatus } : prev);
-    });
-
-    socket.on("video.completed", (data: { taskId: string }) => {
-      if (data.taskId !== taskId) return;
-      setIsTerminal(true);
-      fetchTask();
-      socket.emit("unsubscribe", { resource: "video", id: taskId });
-    });
-
-    socket.on("video.error", (data: { taskId: string; message: string }) => {
-      if (data.taskId !== taskId) return;
-      setIsTerminal(true);
-      toast.error(`Pipeline error: ${data.message}`);
-      fetchTask();
-      socket.emit("unsubscribe", { resource: "video", id: taskId });
-    });
-
-    return () => {
-      socket.emit("unsubscribe", { resource: "video", id: taskId });
-      socket.off("video.progress");
-      socket.off("video.completed");
-      socket.off("video.error");
-    };
-  }, [accessToken, taskId, isTerminal, fetchTask]);
 
   const handleReview = async (clip: VideoClip, action: "approve" | "reject") => {
     setReviewingClipId(clip.id);
     try {
       await reviewClip(clip.id, { action, feedback: feedbacks[clip.id] });
       toast.success(action === "approve" ? "Clip approved" : "Clip rejected");
-      fetchTask();
+      void refetch();
     } catch {
       toast.error("Review failed");
     } finally {
@@ -135,51 +56,22 @@ export function TaskProgress({ taskId, onNewClip }: TaskProgressProps) {
   }
 
   const clips = task.clips ?? [];
-  const isProcessing = !isTerminal && task.status !== "queued";
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Processing</h2>
-          <div className="mt-1 flex items-center gap-2">
-            <span className="font-mono text-xs text-muted-foreground">{taskId.slice(0, 8)}</span>
-            <Badge className={STATUS_COLOR[task.status] ?? "bg-muted"}>
-              {task.status}
-            </Badge>
-          </div>
+          <h2 className="text-lg font-semibold">Video Clipper</h2>
+          <span className="font-mono text-xs text-muted-foreground">{taskId.slice(0, 8)}</span>
         </div>
         <Button variant="outline" size="sm" onClick={onNewClip}>
           New clip
         </Button>
       </div>
 
-      {/* Progress */}
-      {(isProcessing || task.status === "queued") && (
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-3">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              <p className="text-sm font-medium">
-                {STAGE_LABELS[task.status] ?? task.status}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Error */}
-      {task.status === "error" && task.errorMessage && (
-        <Card className="border-red-200">
-          <CardContent className="pt-4">
-            <div className="flex items-start gap-3 text-red-700">
-              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
-              <p className="text-sm">{task.errorMessage}</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Unified pipeline progress */}
+      <PipelineProgress view={view} />
 
       {/* Clips */}
       {clips.length > 0 && (

@@ -9,7 +9,8 @@ import { getSocket, disconnectSocket } from "@/lib/socket";
 
 export function useSocket() {
   const accessToken = useAuthStore((s) => s.accessToken);
-  const { setStatus, setActiveScan, setActivePublish } = usePipelineStore();
+  const { setStatus, setActiveScan, setActivePublish, setActivePipeline } =
+    usePipelineStore();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -26,13 +27,35 @@ export function useSocket() {
     });
 
     socket.on("scan.progress", (data: { status: string; scan_id: string }) => {
+      // During a pipeline run the unified pipeline banner owns the UI (it tracks
+      // its own underlying scan via pipeline.progress). Don't arm the scan-only
+      // banner — it would poll /scans/{id}/status and mislabel the publish stage.
+      if (usePipelineStore.getState().activePipelineId) return;
       setStatus("running", "Scanner");
       setActiveScan(data.scan_id);
     });
 
     socket.on("scan.completed", () => {
       setStatus("idle");
-      setActiveScan(null);
+      // Leave activeScanId set so the banner can render its "done" state and
+      // self-dismiss; clearing it here would unmount the banner instantly.
+      queryClient.invalidateQueries({ queryKey: ["scans"] });
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+    });
+
+    socket.on(
+      "pipeline.progress",
+      (data: { status: string; pipeline_id: string }) => {
+        setStatus("running", "Pipeline");
+        setActivePipeline(data.pipeline_id);
+      },
+    );
+
+    socket.on("pipeline.completed", () => {
+      setStatus("idle");
+      // Leave activePipelineId set so the banner can render its "done" state
+      // and self-dismiss.
+      queryClient.invalidateQueries({ queryKey: ["pipeline-runs"] });
       queryClient.invalidateQueries({ queryKey: ["scans"] });
       queryClient.invalidateQueries({ queryKey: ["posts"] });
     });
@@ -64,5 +87,12 @@ export function useSocket() {
     return () => {
       disconnectSocket();
     };
-  }, [accessToken, setStatus, setActiveScan, setActivePublish, queryClient]);
+  }, [
+    accessToken,
+    setStatus,
+    setActiveScan,
+    setActivePublish,
+    setActivePipeline,
+    queryClient,
+  ]);
 }
