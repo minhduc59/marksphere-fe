@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { QueryProvider } from "@/providers/query-provider";
@@ -11,6 +11,11 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
+});
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-display",
+  weight: ["400", "600", "700", "800"],
 });
 
 const geistSans = localFont({
@@ -25,7 +30,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Marketing Content AI",
+  title: "MarkSphere",
   description: "AI-powered multi-agent marketing content pipeline",
 };
 
@@ -41,6 +46,7 @@ export default function RootLayout({
         "font-sans",
         inter.variable,
         jetbrainsMono.variable,
+        plusJakarta.variable,
         geistSans.variable,
         geistMono.variable
       )}

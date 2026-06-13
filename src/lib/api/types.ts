@@ -102,6 +102,8 @@ export interface PaginatedResponse<T> {
 export interface ScanRun {
   id: string;
   triggeredBy: string | null;
+  /** How the run was started: "manual" | "scheduled". null for legacy rows. */
+  triggeredType: string | null;
   status: ScanStatus;
   platformsRequested: string[];
   platformsCompleted: string[];
@@ -127,6 +129,17 @@ export interface ScanStatusResponse {
   error: string | null;
   current_step?: string | null;
   published_post_ids?: string[];
+}
+
+/** Active recurring scan schedule for the Pipeline Control Center. */
+export interface ScanScheduleResponse {
+  id: string;
+  cron_expression: string;
+  platforms: string[];
+  is_active: boolean;
+  last_run_at: string | null;
+  next_run_at: string | null;
+  created_at: string;
 }
 
 export interface TriggerScanDto {
@@ -428,10 +441,194 @@ export interface PipelineConfig {
   default_privacy_level: string;
   scan_schedule_enabled: boolean;
   scan_cron_expression: string | null;
+  hn_rate_limit_per_min: number;
+  hn_retry_strategy: HnRetryStrategy;
   created_at: string;
   updated_at: string | null;
 }
 
+export type HnRetryStrategy = "exponential" | "linear" | "immediate";
+
 export type PipelineConfigUpdate = Partial<
   Omit<PipelineConfig, "id" | "owner_id" | "created_at" | "updated_at">
 >;
+
+// ── Admin Overview ─────────────────────────────────────
+// Mirrors backend/src/admin/dto/overview-response.dto.ts
+export type HealthStatus = "ok" | "error" | "unknown";
+
+export interface Kpi {
+  label: string;
+  value: number;
+  /** % vs prior 7d; null when the prior window had 0 (render "—"). */
+  deltaPct: number | null;
+}
+
+export interface SeriesPoint {
+  label: string;
+  value: number;
+}
+
+export interface EfficiencyPoint {
+  label: string;
+  generated: number;
+  published: number;
+}
+
+export interface ServiceHealth {
+  label: string;
+  status: HealthStatus;
+}
+
+export interface AdminOverview {
+  kpis: Kpi[];
+  trendScanVolume: {
+    "24h": SeriesPoint[];
+    "7d": SeriesPoint[];
+  };
+  contentPipeline: {
+    generated: number;
+    autoApproved: number;
+    flagged: number;
+    published: number;
+  };
+  outputEfficiency: EfficiencyPoint[];
+  systemHealth: {
+    internal: ServiceHealth[];
+    external: ServiceHealth[];
+  };
+}
+
+// ── Admin User Management ──────────────────────────────
+// Mirrors backend/src/users/dto/users.dto.ts
+export type AdminUserRole = "admin" | "user";
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  role: AdminUserRole;
+  tiktokLinked: boolean;
+  createdAt: string;
+  postsGenerated: number;
+  postsPublished: number;
+  videoClips: number;
+}
+
+export interface AdminUserStats {
+  totalUsers: number;
+  tiktokLinked: number;
+  tiktokNotLinked: number;
+  newThisWeek: number;
+  /** % vs prior 7d; null when the prior window had 0 (render "—"). */
+  deltaPct: number | null;
+}
+
+export interface AdminUserFilters {
+  search?: string;
+  role?: AdminUserRole;
+  tiktok?: "linked" | "not_linked";
+  page?: number;
+  pageSize?: number;
+}
+
+export interface CreateAdminUserDto {
+  email: string;
+  password: string;
+  displayName?: string;
+  role?: AdminUserRole;
+}
+
+export interface UpdateAdminUserDto {
+  role?: AdminUserRole;
+  displayName?: string;
+}
+
+// ── Admin Video Clipping Pipeline ──────────────────────
+// Mirrors backend/src/video-tasks/dto/admin-video-clips.dto.ts
+
+export interface AdminVideoClipOwner {
+  id: string;
+  displayName: string | null;
+  email: string;
+  avatarUrl: string | null;
+}
+
+export interface AdminVideoClipJob {
+  id: string;
+  sourceType: string;
+  sourceRef: string;
+  /** VideoTask pipeline status (queued, transcribing, …, completed, error). */
+  status: string;
+  progress: number;
+  progressMessage: string | null;
+  errorMessage: string | null;
+  clipsProduced: number;
+  /** Target clip count (maxClips). */
+  clipsTotal: number;
+  thumbnailUrl: string | null;
+  owner: AdminVideoClipOwner | null;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface AdminVideoClipsStats {
+  producedToday: number;
+  /** % vs the prior day; null when the prior day had 0 (render "—"). */
+  producedTodayDeltaPct: number | null;
+  inProgress: number;
+  failedTasks: number;
+  /** Avg completed-task processing time in seconds (last 7d); null if none. */
+  avgProcessingSeconds: number | null;
+}
+
+export interface AdminVideoClipsFilters {
+  status?: string;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+/** A produced clip shown in the admin "View Clips" modal. */
+export interface AdminVideoClip {
+  id: string;
+  clipIndex: number;
+  title: string | null;
+  storageUrl: string;
+  thumbnailUrl: string | null;
+  durationSeconds: number;
+  status: string;
+  llmScore: number | null;
+}
+
+// ── Admin Monitoring ───────────────────────────────────
+// Mirrors backend/src/admin/dto/monitoring.dto.ts
+
+export type PipelineStatus = "running" | "idle" | "failed";
+
+export interface PipelineHealth {
+  key: "trend_scanner" | "post_generator" | "publisher" | "video_clipper";
+  title: string;
+  status: PipelineStatus;
+  pending: number;
+  processedLastHour: number;
+  failedLast24h: number;
+  lastActivityAt: string | null;
+}
+
+export type ErrorSeverity = "CRITICAL" | "WARNING" | "INFO";
+
+export interface ErrorLogEntry {
+  severity: ErrorSeverity;
+  timestamp: string;
+  node: string;
+  message: string;
+}
+
+export interface ErrorLogFilters {
+  severity?: ErrorSeverity;
+  page?: number;
+  pageSize?: number;
+}

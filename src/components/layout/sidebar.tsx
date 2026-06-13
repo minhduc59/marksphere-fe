@@ -14,6 +14,7 @@ import {
   X,
   Scissors,
   Film,
+  ShieldCheck,
 } from "lucide-react";
 
 import { useAuthStore } from "@/stores/auth-store";
@@ -36,9 +37,9 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
   { href: "/pipeline", label: "Pipeline", icon: KanbanSquare },
-  { href: "/content", label: "Content", icon: FileText },
+  { href: "/post", label: "Post", icon: FileText },
   { href: "/schedule", label: "Schedule", icon: Calendar },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/video-clipper", label: "Video Clipper", icon: Scissors, exact: true },
@@ -67,23 +68,21 @@ function SidebarContent() {
       // ignore logout API errors
     }
     storeLogout();
-    router.push("/login");
+    router.push("/");
   }
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex h-14 items-center border-b px-4">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center bg-foreground text-background text-xs font-bold">
-            MC
-          </div>
-          <span className="text-sm font-semibold tracking-tight">
-            Marketing AI
-          </span>
+      <div className="flex h-14 items-center border-b px-5">
+        <Link
+          href="/dashboard"
+          className="font-display text-base font-extrabold uppercase tracking-tighter text-foreground"
+        >
+          MarkSphere
         </Link>
       </div>
 
-      <nav className="flex-1 space-y-1 p-3">
+      <nav className="flex-1 space-y-1 px-2 py-4">
         {navItems.map((item) => (
           <SidebarItem
             key={item.href}
@@ -95,14 +94,25 @@ function SidebarContent() {
             }
           />
         ))}
+
+        {user?.role === "admin" && (
+          <SidebarItem
+            href="/admin"
+            label="Admin Panel"
+            icon={ShieldCheck}
+            isActive={pathname.startsWith("/admin")}
+          />
+        )}
       </nav>
 
       <Separator />
 
       <div className="p-3">
         <div className="flex items-center gap-3 px-2 py-2">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+          <Avatar className="h-9 w-9 rounded-none">
+            <AvatarFallback className="rounded-none bg-foreground text-xs font-bold text-background">
+              {initials}
+            </AvatarFallback>
           </Avatar>
           <div className="flex-1 truncate">
             <p className="truncate text-sm font-medium">
