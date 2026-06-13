@@ -39,7 +39,20 @@ apiClient.interceptors.response.use(
       _retry?: boolean;
     };
 
-    if (error.response?.status !== 401 || originalRequest._retry) {
+    // Auth endpoints (login/register/refresh) own their own error handling —
+    // e.g. a 401 on login means bad credentials, which the form surfaces as a
+    // toast. Never trigger the refresh-or-redirect flow for them.
+    const url = originalRequest.url ?? "";
+    const isAuthEndpoint =
+      url.includes("/auth/login") ||
+      url.includes("/auth/register") ||
+      url.includes("/auth/refresh");
+
+    if (
+      error.response?.status !== 401 ||
+      originalRequest._retry ||
+      isAuthEndpoint
+    ) {
       return Promise.reject(error);
     }
 
@@ -60,7 +73,7 @@ apiClient.interceptors.response.use(
       isRefreshing = false;
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
-      window.location.href = "/login";
+      window.location.href = "/";
       return Promise.reject(error);
     }
 
@@ -81,7 +94,7 @@ apiClient.interceptors.response.use(
       processQueue(refreshError, null);
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
-      window.location.href = "/login";
+      window.location.href = "/";
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;

@@ -1,84 +1,100 @@
 "use client";
-import { useState, useEffect } from "react";
-import { KanbanSquare } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { Skeleton } from "@/components/ui/skeleton";
-import { SourceFilter } from "@/components/pipeline/source-filter";
-import { ModeBadge } from "@/components/pipeline/mode-badge";
-import { PipelineBoard } from "@/components/pipeline/board";
-import { ScanPipelineProgress } from "@/components/pipeline/scan-pipeline-progress";
-import { PublishPipelineProgress } from "@/components/pipeline/publish-pipeline-progress";
-import { OverallPipelineProgress } from "@/components/pipeline/overall-pipeline-progress";
-import { usePipelineBoard, type SourceFilter as SF } from "@/hooks/use-pipeline-board";
+
+import { formatDistanceToNowStrict } from "date-fns";
+import { Cog } from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
+import { PipelineActionCards } from "@/components/pipeline/control/action-cards";
+import { RunningNow } from "@/components/pipeline/control/running-now";
+import { ActiveScheduleCard } from "@/components/pipeline/control/active-schedule-card";
+import { RecentRunsTable } from "@/components/pipeline/control/recent-runs-table";
 import { useScans } from "@/hooks/api/use-scans";
-import { usePipelineStore } from "@/stores/pipeline-store";
+import { usePipelineRuns } from "@/hooks/api/use-pipeline-runs";
+import { usePipelineSchedule } from "@/hooks/api/use-pipeline-schedule";
 import { ScanStatus } from "@/lib/api/types";
 
-export default function PipelinePage() {
-  const [sourceFilter, setSourceFilter] = useState<SF>("all");
-  const { columns, isLoading } = usePipelineBoard(sourceFilter);
-  const { data: scansData } = useScans({ pageSize: 5 });
-  const activeScanId = usePipelineStore((s) => s.activeScanId);
-  const activePublishId = usePipelineStore((s) => s.activePublishId);
-  const activePipelineId = usePipelineStore((s) => s.activePipelineId);
-  const queryClient = useQueryClient();
+// Mirrors the backend SCAN_STALE_TIMEOUT_MINUTES watchdog: a run older than
+// this is treated as stuck so it no longer disables the action buttons.
+const STALE_RUN_MS = 30 * 60 * 1000;
 
-  // Determine if there's a running scan for the Daemon/One-time badge
-  const hasRunningScan = scansData?.items.some(
-    (s) => s.status === ScanStatus.RUNNING || s.status === ScanStatus.PENDING
+function isActiveRun(status: ScanStatus, startedAt: string | null): boolean {
+  if (status !== ScanStatus.RUNNING && status !== ScanStatus.PENDING) return false;
+  if (!startedAt) return true;
+  return Date.now() - new Date(startedAt).getTime() < STALE_RUN_MS;
+}
+
+export default function PipelinePage() {
+  const { data: scansData } = useScans(
+    { pageSize: 5 },
+    {
+      refetchInterval: (q) =>
+        q.state.data?.items.some((s) => isActiveRun(s.status, s.startedAt))
+          ? 5000
+          : false,
+    }
+  );
+  const { data: pipelineRuns } = usePipelineRuns(
+    { pageSize: 5 },
+    {
+      refetchInterval: (q) =>
+        q.state.data?.items.some((p) => isActiveRun(p.status, p.created_at))
+          ? 5000
+          : false,
+    }
+  );
+  const { data: schedule } = usePipelineSchedule();
+
+  const hasRunningScan = scansData?.items.some((s) =>
+    isActiveRun(s.status, s.startedAt)
+  );
+  const hasRunningPipeline = pipelineRuns?.items?.some((p) =>
+    isActiveRun(p.status, p.created_at)
   );
 
-  // Poll every 8s as a fallback (the progress banner owns its own WS subscription)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
-      queryClient.invalidateQueries({ queryKey: ["publish"] });
-    }, 8_000);
-    return () => clearInterval(interval);
-  }, [queryClient]);
-
-  const pendingReviewCount = columns.get("pending_review")?.length ?? 0;
+  const lastRun = scansData?.items?.[0];
 
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <KanbanSquare className="h-5 w-5 text-muted-foreground" />
-          <h1 className="text-xl font-bold tracking-tight">Pipeline</h1>
-          {pendingReviewCount > 0 && (
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
-              {pendingReviewCount}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold tracking-tight">Pipeline</h1>
+          <Badge
+            variant="outline"
+            className="gap-1 text-[10px] font-bold uppercase tracking-wide"
+          >
+            <Cog className="h-3 w-3" />
+            {schedule ? "Daemon" : "Manual"}
+          </Badge>
+          {lastRun && (
+            <span className="text-xs text-muted-foreground">
+              Last run{" "}
+              {formatDistanceToNowStrict(new Date(lastRun.startedAt), {
+                addSuffix: true,
+              })}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          <SourceFilter value={sourceFilter} onChange={setSourceFilter} />
-          <ModeBadge mode={hasRunningScan ? "daemon" : "onetime"} />
+      </div>
+
+      {/* Action bar */}
+      <PipelineActionCards
+        scanDisabled={hasRunningScan}
+        pipelineDisabled={hasRunningScan || hasRunningPipeline}
+      />
+
+      {/* Running now + active schedule */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <RunningNow />
+        </div>
+        <div className="lg:col-span-1">
+          <ActiveScheduleCard />
         </div>
       </div>
 
-      {/* Live pipeline trackers — stay visible until dismissed or clean success */}
-      {activePipelineId && (
-        <OverallPipelineProgress pipelineId={activePipelineId} />
-      )}
-      {activeScanId && !activePipelineId && (
-        <ScanPipelineProgress scanId={activeScanId} />
-      )}
-      {activePublishId && <PublishPipelineProgress publishId={activePublishId} />}
-
-      {/* Board */}
-      {isLoading ? (
-        <div className="flex gap-3 overflow-x-auto">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-64 w-72 shrink-0" />
-          ))}
-        </div>
-      ) : (
-        <div className="flex-1 overflow-hidden">
-          <PipelineBoard columns={columns} />
-        </div>
-      )}
+      {/* Run history */}
+      <RecentRunsTable />
     </div>
   );
 }

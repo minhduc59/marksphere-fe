@@ -59,7 +59,7 @@ export default function SchedulePage() {
           icon={Calendar}
           title="Nothing scheduled"
           description="Approve and schedule content to see it here."
-          action={{ label: "Browse Content", href: "/content" }}
+          action={{ label: "Browse Posts", href: "/post" }}
         />
       ) : (
         <div className="grid gap-6 lg:grid-cols-3" data-section="calendar">

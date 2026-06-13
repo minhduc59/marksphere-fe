@@ -57,7 +57,7 @@ export default function AnalyticsPage() {
           icon={BarChart3}
           title="No analytics data yet"
           description="Publish your first post to start tracking performance."
-          action={{ label: "Browse Content", href: "/content" }}
+          action={{ label: "Browse Posts", href: "/post" }}
         />
       </div>
     );

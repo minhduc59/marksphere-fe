@@ -21,10 +21,10 @@ export function SidebarItem({
     <Link
       href={href}
       className={cn(
-        "flex items-center gap-3 px-3 py-2 text-sm font-medium transition-colors",
+        "flex items-center gap-3 border-l-2 px-3 py-2.5 text-sm transition-colors",
         isActive
-          ? "bg-accent text-accent-foreground"
-          : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+          ? "border-foreground bg-accent font-semibold text-foreground"
+          : "border-transparent font-medium text-muted-foreground hover:bg-accent/50 hover:text-foreground"
       )}
     >
       <Icon className="h-4 w-4 shrink-0" />
