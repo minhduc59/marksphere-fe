@@ -36,7 +36,11 @@ export default function ContentPage() {
 
   const queryParams = useMemo(
     () => ({
-      ...(filters.status !== "all"
+      // The board groups every status into its own column client-side, so a
+      // server-side status filter would empty out the other columns and make a
+      // post vanish the moment it changes status. Only the list view filters by
+      // status server-side.
+      ...(view === "list" && filters.status !== "all"
         ? { status: filters.status as ContentStatus }
         : {}),
       ...(filters.format !== "all"
@@ -80,7 +84,12 @@ export default function ContentPage() {
         <ViewToggle value={view} onChange={setView} />
       </div>
 
-      <ContentFilters value={filters} onChange={updateFilters} summary={summary} />
+      <ContentFilters
+        value={filters}
+        onChange={updateFilters}
+        summary={summary}
+        hideStatus={view === "board"}
+      />
 
       {isLoading ? (
         <div className="space-y-3">

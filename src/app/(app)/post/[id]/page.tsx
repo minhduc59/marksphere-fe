@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import DynamicVideoPlayer from "@/components/video-clipper/dynamic-video-player";
@@ -12,7 +13,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { ContentStatusBadge } from "@/components/ui/content-status-badge";
-import { usePost, useUpdatePostStatus, useRetryPost } from "@/hooks/api/use-posts";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  usePost,
+  useUpdatePostStatus,
+  useRetryPost,
+  useDeletePost,
+} from "@/hooks/api/use-posts";
 import { usePublishNow, useAutoPublish } from "@/hooks/api/use-publish";
 import { ContentStatus, PostFormat } from "@/lib/api/types";
 
@@ -60,6 +76,8 @@ export default function ContentDetailPage({
   const retryPostMutation = useRetryPost();
   const publishNow = usePublishNow();
   const autoPublish = useAutoPublish();
+  const deletePost = useDeletePost();
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (isLoading) {
     return (
@@ -362,11 +380,39 @@ export default function ContentDetailPage({
                     </Button>
                   </>
                 )}
+
+                <Separator />
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  onClick={() => setConfirmDelete(true)}
+                  disabled={deletePost.isPending}
+                >
+                  Delete Post
+                </Button>
               </CardContent>
             </Card>
           )}
         </div>
       </div>
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this post?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the post and its publish records. This
+              cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deletePost.mutate(post.id)}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

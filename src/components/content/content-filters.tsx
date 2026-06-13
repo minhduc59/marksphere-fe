@@ -38,27 +38,34 @@ interface Props {
   onChange: (next: ContentFilterState) => void;
   /** Optional right-aligned summary, e.g. "Showing 12 of 72". */
   summary?: string;
+  /**
+   * Hide the status filter — used by the board view, where each status already
+   * has its own column so a status filter would be redundant and confusing.
+   */
+  hideStatus?: boolean;
 }
 
 /** Shared Status / Format / Date filter bar for both Content views. */
-export function ContentFilters({ value, onChange, summary }: Props) {
+export function ContentFilters({ value, onChange, summary, hideStatus }: Props) {
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3">
-      <Select
-        value={value.status}
-        onValueChange={(status) => onChange({ ...value, status })}
-      >
-        <SelectTrigger className="w-[170px]">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {STATUS_OPTIONS.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {!hideStatus && (
+        <Select
+          value={value.status}
+          onValueChange={(status) => onChange({ ...value, status })}
+        >
+          <SelectTrigger className="w-[170px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
 
       <Select
         value={value.format}
