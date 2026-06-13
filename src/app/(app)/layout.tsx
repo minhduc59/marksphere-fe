@@ -9,11 +9,18 @@ import { getMe } from "@/lib/api/auth";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSocket } from "@/hooks/use-socket";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isAuthenticated, isLoading, hydrate, setUser } =
     useAuthStore();
+
+  // Global WebSocket listener for the whole authenticated session: surfaces
+  // publish/scan/pipeline toasts and invalidates the relevant query caches
+  // (e.g. ["posts"] when a post flips to published) so the board/list update
+  // the moment a status changes.
+  useSocket();
 
   useEffect(() => {
     hydrate();

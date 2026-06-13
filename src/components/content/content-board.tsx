@@ -69,14 +69,15 @@ export function ContentBoard({ posts }: Props) {
       const col = COLUMNS.find((c) => c.statuses.includes(post.status));
       if (col) map.get(col.key)!.push(post);
     }
-    // Newest first within each column.
+    // Most recently updated first within each column, so a post that just
+    // changed status (e.g. was approved) jumps to the top of its column.
+    // Falls back to createdAt when updatedAt is missing.
     COLUMNS.forEach((col) => {
-      map
-        .get(col.key)!
-        .sort(
-          (a: ContentPost, b: ContentPost) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+      map.get(col.key)!.sort((a: ContentPost, b: ContentPost) => {
+        const at = new Date(a.updatedAt ?? a.createdAt).getTime();
+        const bt = new Date(b.updatedAt ?? b.createdAt).getTime();
+        return bt - at;
+      });
     });
     return map;
   }, [posts]);
@@ -130,9 +131,17 @@ export function ContentBoard({ posts }: Props) {
                           : "—"}
                       </span>
                       <span className="text-[10px] text-muted-foreground">
-                        {formatDistanceToNowStrict(new Date(post.createdAt), {
-                          addSuffix: true,
-                        })}
+                        {/* Draft shows age since creation; once a post moves on
+                            (needs revision / approved / published) we show how
+                            long since it was last updated. */}
+                        {formatDistanceToNowStrict(
+                          new Date(
+                            col.key === "draft"
+                              ? post.createdAt
+                              : post.updatedAt ?? post.createdAt
+                          ),
+                          { addSuffix: true }
+                        )}
                       </span>
                     </div>
                   </button>

@@ -90,6 +90,11 @@ export async function retryPost(id: string) {
   return data;
 }
 
+/** Permanently delete a post. Published posts are rejected by the API (409). */
+export async function deletePost(id: string): Promise<void> {
+  await apiClient.delete(`/posts/${id}`);
+}
+
 /**
  * Poll GET /posts/:id until the row settles out of a transient state.
  *

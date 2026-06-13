@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   getPosts,
@@ -8,6 +9,7 @@ import {
   createPostFromArticle,
   reviewPost,
   retryPost,
+  deletePost,
   type ArticleInput,
 } from "@/lib/api/posts";
 import type { ContentStatus, PostFilters, PostGenRequest } from "@/lib/api/types";
@@ -107,5 +109,19 @@ export function useRetryPost() {
       toast.success("Retrying — regenerating this post");
     },
     onError: () => toast.error("Retry failed"),
+  });
+}
+
+export function useDeletePost() {
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  return useMutation({
+    mutationFn: (id: string) => deletePost(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      toast.success("Post deleted");
+      router.push("/post");
+    },
+    onError: () => toast.error("Failed to delete post"),
   });
 }
