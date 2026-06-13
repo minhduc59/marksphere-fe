@@ -26,6 +26,7 @@ import {
 import {
   usePost,
   useUpdatePostStatus,
+  useReviewPost,
   useRetryPost,
   useDeletePost,
 } from "@/hooks/api/use-posts";
@@ -73,11 +74,14 @@ export default function ContentDetailPage({
   const { id } = params;
   const { data: post, isLoading } = usePost(id);
   const updateStatus = useUpdatePostStatus();
+  const review = useReviewPost();
   const retryPostMutation = useRetryPost();
   const publishNow = usePublishNow();
   const autoPublish = useAutoPublish();
   const deletePost = useDeletePost();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [revisionOpen, setRevisionOpen] = useState(false);
+  const [revisionFeedback, setRevisionFeedback] = useState("");
 
   if (isLoading) {
     return (
@@ -94,6 +98,21 @@ export default function ContentDetailPage({
   }
 
   const isReadOnly = post.status === ContentStatus.PUBLISHED;
+
+  function handleSendForRevision() {
+    if (!post) return;
+    const feedback = revisionFeedback.trim();
+    if (!feedback) return;
+    review.mutate(
+      { id: post.id, action: "reject", feedback },
+      {
+        onSuccess: () => {
+          setRevisionFeedback("");
+          setRevisionOpen(false);
+        },
+      }
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -341,21 +360,57 @@ export default function ContentDetailPage({
                   </Button>
                 )}
 
-                {post.status === ContentStatus.DRAFT && (
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() =>
-                      updateStatus.mutate({
-                        id: post.id,
-                        status: ContentStatus.NEEDS_REVISION,
-                      })
-                    }
-                    disabled={updateStatus.isPending}
-                  >
-                    Needs Revision
-                  </Button>
-                )}
+                {(post.status === ContentStatus.DRAFT ||
+                  post.status === ContentStatus.NEEDS_REVISION ||
+                  post.status === ContentStatus.FLAGGED_FOR_REVIEW) &&
+                  (!revisionOpen ? (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setRevisionOpen(true)}
+                      disabled={updateStatus.isPending || review.isPending}
+                    >
+                      {post.status === ContentStatus.DRAFT
+                        ? "Needs Revision"
+                        : "Send Feedback & Regenerate"}
+                    </Button>
+                  ) : (
+                    <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50/50 p-3">
+                      <Textarea
+                        value={revisionFeedback}
+                        onChange={(e) => setRevisionFeedback(e.target.value)}
+                        placeholder="What should the AI fix? (e.g. hook is weak, tone too formal, add a concrete example)"
+                        className="min-h-[90px] text-sm"
+                        autoFocus
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        The AI rewrites the post using your feedback, then moves
+                        it back to Draft.
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          className="flex-1"
+                          onClick={handleSendForRevision}
+                          disabled={
+                            review.isPending || !revisionFeedback.trim()
+                          }
+                        >
+                          {review.isPending ? "Sending…" : "Send for Revision"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => {
+                            setRevisionOpen(false);
+                            setRevisionFeedback("");
+                          }}
+                          disabled={review.isPending}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
 
                 {post.status === ContentStatus.APPROVED && (
                   <>
