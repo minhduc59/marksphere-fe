@@ -38,35 +38,35 @@ export default function VideoClipperPage() {
   });
   const { register, watch, setValue, handleSubmit } = form;
 
-  const [fileName, setFileName]     = useState<string | null>(null);
-  const [fonts, setFonts]           = useState<Font[]>([]);
-  const [templates, setTemplates]   = useState<CaptionTemplate[]>([]);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [fonts, setFonts] = useState<Font[]>([]);
+  const [templates, setTemplates] = useState<CaptionTemplate[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
   // Media preview state
-  const [mediaSrc, setMediaSrc]     = useState<string | null>(null);
-  const [mediaType, setMediaType]   = useState<"video" | "image" | null>(null);
+  const [mediaSrc, setMediaSrc] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<"video" | "image" | null>(null);
   const [, setVideoDuration] = useState(0);
 
-  const fileRef      = useRef<File | null>(null);
+  const fileRef = useRef<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const blobUrlRef   = useRef<string | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
 
   // Revoke blob URL on unmount
   useEffect(() => {
     return () => { if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current); };
   }, []);
 
-  const maxClips   = watch("maxClips");
+  const maxClips = watch("maxClips");
 
   useEffect(() => {
     listFonts()
       .then(setFonts)
-      .catch(() => {});
+      .catch(() => { });
     listCaptionTemplates()
       .then(setTemplates)
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const clearMedia = () => {
@@ -78,8 +78,15 @@ export default function VideoClipperPage() {
     setValue("endTimeSeconds", 0, { shouldDirty: false });
   };
 
+  const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
+    if (file && file.size > MAX_FILE_SIZE) {
+      toast.error("File too large. Maximum allowed size is 100 MB.");
+      e.target.value = "";
+      return;
+    }
     fileRef.current = file;
     setFileName(file?.name ?? null);
     if (file) {
@@ -200,7 +207,7 @@ export default function VideoClipperPage() {
                     <>
                       <p className="text-sm font-medium">Click to upload video</p>
                       <p className="text-xs text-muted-foreground">
-                        MP4, MOV, WebM up to 500 MB
+                        MP4, MOV, WebM up to 100 MB
                       </p>
                     </>
                   )}
