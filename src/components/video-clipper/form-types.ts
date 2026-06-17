@@ -10,8 +10,6 @@ import type {
 
 export interface CreateClipFormValues {
   // Source
-  sourceType: "url" | "upload";
-  urlInput: string;
   maxClips: number;
   fontId: string;
   captionTemplateId: string;
@@ -32,8 +30,6 @@ export interface CreateClipFormValues {
 }
 
 export const DEFAULT_FORM_VALUES: CreateClipFormValues = {
-  sourceType: "url",
-  urlInput: "",
   maxClips: 5,
   fontId: "",
   captionTemplateId: "",

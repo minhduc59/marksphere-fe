@@ -2,11 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
-import { Scissors, Link as LinkIcon, Upload, Loader2 } from "lucide-react";
+import { Scissors, Upload, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -32,19 +31,6 @@ import {
   type Font,
   type CaptionTemplate,
 } from "@/lib/api/video";
-
-function extractYouTubeId(url: string): string | null {
-  try {
-    const u = new URL(url.trim());
-    const v = u.searchParams.get("v");
-    if (v) return v;
-    if (u.hostname === "youtu.be") return u.pathname.slice(1) || null;
-    const m = u.pathname.match(/^\/embed\/([^/]+)/);
-    return m ? m[1] : null;
-  } catch {
-    return null;
-  }
-}
 
 export default function VideoClipperPage() {
   const form = useForm<CreateClipFormValues>({
@@ -72,24 +58,7 @@ export default function VideoClipperPage() {
     return () => { if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current); };
   }, []);
 
-  const sourceType = watch("sourceType");
-  const urlInput   = watch("urlInput");
   const maxClips   = watch("maxClips");
-
-  // YouTube thumbnail extraction
-  useEffect(() => {
-    if (sourceType !== "url") return;
-    const id = extractYouTubeId(urlInput);
-    if (id) {
-      setMediaSrc(`https://img.youtube.com/vi/${id}/maxresdefault.jpg`);
-      setMediaType("image");
-    } else {
-      setMediaSrc(null);
-      setMediaType(null);
-    }
-    setValue("startTimeSeconds", 0, { shouldDirty: false });
-    setValue("endTimeSeconds", 0, { shouldDirty: false });
-  }, [urlInput, sourceType, setValue]);
 
   useEffect(() => {
     listFonts()
@@ -125,22 +94,17 @@ export default function VideoClipperPage() {
   };
 
   const onSubmit = async (values: CreateClipFormValues) => {
-    if (values.sourceType === "url" && !values.urlInput.trim()) return;
-    if (values.sourceType === "upload" && !fileRef.current) return;
+    if (!fileRef.current) return;
 
     setIsSubmitting(true);
     try {
-      let sourceRef = values.urlInput.trim();
-      if (values.sourceType === "upload" && fileRef.current) {
-        const formData = new FormData();
-        formData.append("file", fileRef.current);
-        const uploaded = await uploadMedia(formData);
-        sourceRef = uploaded.url;
-      }
+      const formData = new FormData();
+      formData.append("file", fileRef.current);
+      const uploaded = await uploadMedia(formData);
 
       const task = await createVideoTask({
-        sourceType: values.sourceType,
-        sourceRef,
+        sourceType: "upload",
+        sourceRef: uploaded.url,
         fontId: values.fontId || undefined,
         captionTemplateId: values.captionTemplateId || undefined,
         maxClips: values.maxClips,
@@ -217,76 +181,30 @@ export default function VideoClipperPage() {
                 <CardTitle className="text-sm font-semibold">Source</CardTitle>
               </CardHeader>
               <CardContent className="space-y-5">
-                {/* Source type tabs */}
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setValue("sourceType", "url");
-                      setFileName(null);
-                      fileRef.current = null;
-                      clearMedia();
-                    }}
-                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                      sourceType === "url"
-                        ? "bg-foreground text-background"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    }`}
-                  >
-                    <LinkIcon className="h-4 w-4" />
-                    YouTube URL
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setValue("sourceType", "upload"); clearMedia(); }}
-                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                      sourceType === "upload"
-                        ? "bg-foreground text-background"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    }`}
-                  >
-                    <Upload className="h-4 w-4" />
-                    Upload Video
-                  </button>
+                <div
+                  className="cursor-pointer rounded-lg border-2 border-dashed p-8 text-center transition-colors hover:border-foreground/40"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input
+                    type="file"
+                    accept="video/*"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    disabled={isSubmitting}
+                    className="hidden"
+                  />
+                  <Upload className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+                  {fileName ? (
+                    <p className="text-sm font-medium">{fileName}</p>
+                  ) : (
+                    <>
+                      <p className="text-sm font-medium">Click to upload video</p>
+                      <p className="text-xs text-muted-foreground">
+                        MP4, MOV, WebM up to 500 MB
+                      </p>
+                    </>
+                  )}
                 </div>
-
-                {sourceType === "url" ? (
-                  <div className="space-y-1">
-                    <Label htmlFor="url">YouTube URL</Label>
-                    <Input
-                      id="url"
-                      type="url"
-                      placeholder="https://www.youtube.com/watch?v=..."
-                      disabled={isSubmitting}
-                      {...register("urlInput")}
-                    />
-                  </div>
-                ) : (
-                  <div
-                    className="cursor-pointer rounded-lg border-2 border-dashed p-8 text-center transition-colors hover:border-foreground/40"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <input
-                      type="file"
-                      accept="video/*"
-                      ref={fileInputRef}
-                      onChange={handleFileChange}
-                      disabled={isSubmitting}
-                      className="hidden"
-                    />
-                    <Upload className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
-                    {fileName ? (
-                      <p className="text-sm font-medium">{fileName}</p>
-                    ) : (
-                      <>
-                        <p className="text-sm font-medium">Click to upload video</p>
-                        <p className="text-xs text-muted-foreground">
-                          MP4, MOV, WebM up to 500 MB
-                        </p>
-                      </>
-                    )}
-                  </div>
-                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="maxClips">Max Clips: {maxClips}</Label>
@@ -359,11 +277,7 @@ export default function VideoClipperPage() {
             <Button
               type="submit"
               className="w-full"
-              disabled={
-                isSubmitting ||
-                (sourceType === "url" && !urlInput.trim()) ||
-                (sourceType === "upload" && !fileRef.current)
-              }
+              disabled={isSubmitting || !fileRef.current}
             >
               {isSubmitting ? (
                 <>
