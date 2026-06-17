@@ -138,7 +138,6 @@ export function ClipCard({ clip, onPreview, onDuplicate, onDelete }: ClipCardPro
           {clip.title || clip.transcriptSegment || "Untitled clip"}
         </p>
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span className="truncate">From: {clip.sourceRef || clip.taskId.slice(0, 8)}</span>
           <span>{created}</span>
         </div>
         <div className="flex items-center justify-between">

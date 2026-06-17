@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
 import DynamicVideoPlayer from "@/components/video-clipper/dynamic-video-player";
 
 import { useAuthStore } from "@/stores/auth-store";
@@ -57,7 +56,6 @@ export default function VideoTaskPage({
   const [task, setTask] = useState<VideoTask | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isTerminal, setIsTerminal] = useState(false);
-  const [feedbacks, setFeedbacks] = useState<Record<string, string>>({});
   const [reviewingClipId, setReviewingClipId] = useState<string | null>(null);
 
   const fetchTask = useCallback(async () => {
@@ -116,7 +114,7 @@ export default function VideoTaskPage({
   const handleReview = async (clip: VideoClip, action: "approve" | "reject") => {
     setReviewingClipId(clip.id);
     try {
-      await reviewClip(clip.id, { action, feedback: feedbacks[clip.id] });
+      await reviewClip(clip.id, { action });
       toast.success(action === "approve" ? "Clip approved" : "Clip rejected");
       fetchTask();
     } catch {
@@ -218,8 +216,8 @@ export default function VideoTaskPage({
                         clip.status === "approved"
                           ? "border-green-500 text-green-700"
                           : clip.status === "rejected"
-                          ? "border-red-500 text-red-700"
-                          : ""
+                            ? "border-red-500 text-red-700"
+                            : ""
                       }
                     >
                       {clip.status}
@@ -235,17 +233,6 @@ export default function VideoTaskPage({
                   {/* Review actions — only shown for draft clips */}
                   {clip.status === "draft" && (
                     <div className="space-y-2">
-                      <Textarea
-                        placeholder="Feedback (optional)"
-                        value={feedbacks[clip.id] ?? ""}
-                        onChange={(e) =>
-                          setFeedbacks((prev) => ({
-                            ...prev,
-                            [clip.id]: e.target.value,
-                          }))
-                        }
-                        className="min-h-[60px] text-xs"
-                      />
                       <div className="flex gap-2">
                         <Button
                           size="sm"
