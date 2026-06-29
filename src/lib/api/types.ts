@@ -129,6 +129,7 @@ export interface ScanStatusResponse {
   error: string | null;
   current_step?: string | null;
   published_post_ids?: string[];
+  source_type?: string | null;
 }
 
 /** Active recurring scan schedule for the Pipeline Control Center. */
@@ -181,6 +182,7 @@ export interface PipelineRunStatusResponse {
   started_at: string | null;
   completed_at: string | null;
   duration_ms: number | null;
+  source_type?: string | null;
 }
 
 // ── Trend ──────────────────────────────────────────────

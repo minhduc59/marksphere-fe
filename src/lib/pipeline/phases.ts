@@ -193,9 +193,25 @@ export function mapScanToView(
   // run honestly ends after Post Generation (manual-review mode).
   const includePublish =
     s?.current_step === "publishing" || !!s?.published_post_ids?.length;
-  const phases = includePublish
-    ? [...SCAN_PHASES, SCAN_PUBLISH_PHASE]
+
+  // For From-URL runs, rename the first crawl stage to "Crawl Article".
+  const isArticleUrl = s?.source_type === "article_url";
+  const baseScanPhases: Phase[] = isArticleUrl
+    ? [
+      {
+        ...SCAN_PHASES[0],
+        stages: [
+          { keys: ["crawling", "collecting"], label: "Crawl Article" },
+          ...SCAN_PHASES[0].stages.slice(1),
+        ],
+      },
+      ...SCAN_PHASES.slice(1),
+    ]
     : SCAN_PHASES;
+
+  const phases = includePublish
+    ? [...baseScanPhases, SCAN_PUBLISH_PHASE]
+    : baseScanPhases;
   const total = flatten(phases).length;
   const step = s?.current_step ?? null;
   const status = s?.status ?? ScanStatus.RUNNING;
@@ -227,15 +243,15 @@ export function mapScanToView(
         : state === "done" || state === "partial"
           ? "Scan complete"
           : phaseTitle(
-              phases,
-              activeIndex,
-              {
-                scan: "Scanning",
-                generate: "Generating posts",
-                publish: "Publishing",
-              },
-              "Scanning",
-            ),
+            phases,
+            activeIndex,
+            {
+              scan: "Scanning",
+              generate: "Generating posts",
+              publish: "Publishing",
+            },
+            "Scanning",
+          ),
     phases,
     activeIndex,
     state,
@@ -254,7 +270,23 @@ export function mapPipelineToView(
   // Post Generation (manual-review mode).
   const includePublish =
     s?.stage === "publishing" || !!s?.published_post_ids?.length;
-  const phases = includePublish ? PIPELINE_PHASES : PIPELINE_PHASES.slice(0, 2);
+
+  // For From-URL runs, rename the first crawl stage to "Crawl Article".
+  const isArticleUrl = s?.source_type === "article_url";
+  const basePipelinePhases: Phase[] = isArticleUrl
+    ? [
+      {
+        ...PIPELINE_PHASES[0],
+        stages: [
+          { keys: ["crawling", "collecting"], label: "Crawl Article" },
+          ...PIPELINE_PHASES[0].stages.slice(1),
+        ],
+      },
+      ...PIPELINE_PHASES.slice(1),
+    ]
+    : PIPELINE_PHASES;
+
+  const phases = includePublish ? basePipelinePhases : basePipelinePhases.slice(0, 2);
   const total = flatten(phases).length;
   const step = s?.current_step ?? null;
   const status = s?.status ?? ScanStatus.RUNNING;
@@ -283,15 +315,15 @@ export function mapPipelineToView(
         : state === "done" || state === "partial"
           ? "Pipeline complete"
           : phaseTitle(
-              phases,
-              activeIndex,
-              {
-                scan: "Scanning",
-                generate: "Generating posts",
-                publish: "Publishing",
-              },
-              "Running pipeline",
-            ),
+            phases,
+            activeIndex,
+            {
+              scan: "Scanning",
+              generate: "Generating posts",
+              publish: "Publishing",
+            },
+            "Running pipeline",
+          ),
     phases,
     activeIndex,
     state,
@@ -374,11 +406,11 @@ export function mapVideoToView(
           : state === "done"
             ? "Clips ready"
             : phaseTitle(
-                phases,
-                activeIndex,
-                { prepare: "Preparing video", produce: "Producing clips" },
-                "Processing",
-              ),
+              phases,
+              activeIndex,
+              { prepare: "Preparing video", produce: "Producing clips" },
+              "Processing",
+            ),
     phases,
     activeIndex,
     state,
